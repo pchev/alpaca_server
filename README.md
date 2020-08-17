@@ -2,7 +2,7 @@
 
 ASCOM Alpaca server, Free Pascal / Lazarus package 
 
-This package is the base code to implement an Alpaca driver using Free Pascal compiler.
+This package is the base code to implement an Alpaca server/driver using Free Pascal compiler.
 
 ## Use
 
