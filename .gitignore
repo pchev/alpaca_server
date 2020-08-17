@@ -1,0 +1,19 @@
+# ignore backup dir
+src/backup/
+example/backup/
+# ignore fpc makefiles
+Makefile
+Makefile.fpc
+Makefile.fpcxxx
+# ignore build dir
+example/lib/
+src/lib/
+src/units/
+src/synapse/lib/
+# ignore various files
+example/*.lps
+src/*.lps
+# ignore binary
+*.o
+example_lcl
+example_lcl.exe
