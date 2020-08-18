@@ -54,6 +54,7 @@ begin
   Memo1.Clear;
 
   AlpacaServer:=T_AlpacaServer.Create(self);
+  AlpacaServer.ServerName:='Example of Alpaca server';
   AlpacaServer.onShowError:=@ShowError;
   AlpacaServer.onShowMsg:=@ShowMsg;
   AlpacaServer.onPortMsg:=@PortMsg;

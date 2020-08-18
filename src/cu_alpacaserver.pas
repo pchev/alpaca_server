@@ -56,6 +56,7 @@ type
       ServerTransactionID: LongWord;
       FIPAddr, FIPPort : string;
       FDiscoveryPort : string;
+      FServerName, FManufacturer, FLocation : string;
       FShowMsg: TStringProc;
       FShowError: TStringProc;
       FPortMsg: TStringProc;
@@ -78,6 +79,9 @@ type
       property IPAddr:string read FIPAddr write FIPAddr;
       property IPPort:string read FIPPort write FIPPort;
       property DiscoveryPort:string read FDiscoveryPort write FDiscoveryPort;
+      property ServerName:string read FServerName write FServerName;
+      property Manufacturer:string read FManufacturer write FManufacturer;
+      property Location:string read FLocation write FLocation;
       property onShowError: TStringProc read FShowError write FShowError;
       property onShowMsg: TStringProc read FShowMsg write FShowMsg;
       property onPortMsg: TStringProc read FPortMsg write FPortMsg;
@@ -108,6 +112,9 @@ begin
   FIPAddr := '0.0.0.0';
   FIPPort := '11122';
   FDiscoveryPort := '32227';
+  FServerName := 'ASCOM Alpaca Server - Freepascal-Synapse';
+  FManufacturer:='Alpaca Server project';
+  FLocation:='https://github.com/pchev/alpaca_server';
   DefaultFormatSettings.DecimalSeparator := '.';
   DefaultFormatSettings.ThousandSeparator := ',';
   DefaultFormatSettings.DateSeparator := '/';
@@ -224,7 +231,7 @@ begin
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: application/json; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc;
       end
@@ -234,7 +241,7 @@ begin
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
                +'Date: ' + Rfc822DateTime(now) + CRLF
-               +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+               +'Server: ' + FServerName + CRLF
                +'' + CRLF
                +doc;
       end;
@@ -246,7 +253,7 @@ begin
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc + CRLF;
     end;
@@ -260,7 +267,7 @@ begin
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc + CRLF;
     end;
@@ -294,7 +301,7 @@ begin
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: application/json; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc;
     end
@@ -304,7 +311,7 @@ begin
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc;
     end;
@@ -316,7 +323,7 @@ begin
            +'Connection: close' + CRLF
            +'Content-type: text/html; charset=utf-8' + CRLF
            +'Date: ' + Rfc822DateTime(now) + CRLF
-           +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+           +'Server: ' + FServerName + CRLF
            +'' + CRLF
            +doc + CRLF;
   end;
@@ -328,7 +335,7 @@ begin
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc + CRLF;
     end;
@@ -353,7 +360,7 @@ begin
            +'Content-type: text/html; charset=utf-8' + CRLF
            +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
            +'Date: ' + Rfc822DateTime(now) + CRLF
-           +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+           +'Server: ' + FServerName + CRLF
            +'' + CRLF
            +doc;
   end else begin
@@ -375,7 +382,7 @@ begin
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
                +'Date: ' + Rfc822DateTime(now) + CRLF
-               +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+               +'Server: ' + FServerName + CRLF
                +'' + CRLF
                +doc;
       end
@@ -385,7 +392,7 @@ begin
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
                +'Date: ' + Rfc822DateTime(now) + CRLF
-               +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+               +'Server: ' + FServerName + CRLF
                +'' + CRLF
                +doc;
       end;
@@ -396,7 +403,7 @@ begin
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc + CRLF;
     end;
@@ -472,10 +479,10 @@ begin
     status:=200;
   end
   else if method='v1/description' then begin
-    value:='{"ServerName": "ASCOM Alpaca Server - Freepascal-Synapse",'+
-            '"Manufacturer": "Patrick Chevalley",'+
+    value:='{"ServerName": "' + FServerName + '",'+
+            '"Manufacturer": "' + FManufacturer + '",'+
             '"ManufacturerVersion": "v'+server_version+'",'+
-            '"Location": "http://www.ap-i.net"}';
+            '"Location": "'+ FLocation +'"}';
     doc:=DeviceList[0].device.FormatRawResp(value,ClientTransactionID,ServerTransactionID,ErrorNumber,ErrorMessage);
     status:=200;
   end
@@ -498,7 +505,7 @@ begin
            +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
            +'Content-type: application/json; charset=utf-8' + CRLF
            +'Date: ' + Rfc822DateTime(now) + CRLF
-           +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+           +'Server: ' + FServerName + CRLF
            +'' + CRLF
            +doc;
     end
@@ -508,7 +515,7 @@ begin
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
-             +'Server: ASCOM Alpaca Server - Freepascal-Synapse' + CRLF
+             +'Server: ' + FServerName + CRLF
              +'' + CRLF
              +doc;
     end;
