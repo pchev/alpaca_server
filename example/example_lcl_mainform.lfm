@@ -10,8 +10,8 @@ object Form1: TForm1
   OnCreate = FormCreate
   object Memo1: TMemo
     Left = 0
-    Height = 202
-    Top = 130
+    Height = 198
+    Top = 134
     Width = 402
     Align = alClient
     Lines.Strings = (
@@ -50,19 +50,27 @@ object Form1: TForm1
   end
   object Panel2: TPanel
     Left = 0
-    Height = 50
+    Height = 54
     Top = 80
     Width = 402
     Align = alTop
-    ClientHeight = 50
+    ClientHeight = 54
     ClientWidth = 402
     TabOrder = 1
     object Server_Info: TLabel
       Left = 8
       Height = 17
-      Top = 16
+      Top = 4
       Width = 74
       Caption = 'Server_Info'
+      ParentColor = False
+    end
+    object Discovery_Info: TLabel
+      Left = 8
+      Height = 17
+      Top = 27
+      Width = 93
+      Caption = 'Discovery_Info'
       ParentColor = False
     end
   end

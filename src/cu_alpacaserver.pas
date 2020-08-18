@@ -51,15 +51,19 @@ type
   T_AlpacaServer = class(TComponent)
     protected
       TCPDaemon: TTCPDaemon;
+      Discovery: TDiscoveryDaemon;
       DeviceList: T_AlpacaDeviceList;
       ServerTransactionID: LongWord;
       FIPAddr, FIPPort : string;
+      FDiscoveryPort : string;
       FShowMsg: TStringProc;
       FShowError: TStringProc;
       FPortMsg: TStringProc;
+      FDiscoveryPortMsg: TStringProc;
       procedure ShowError(var msg:string);
       procedure ShowMsg(var msg:string);
       procedure ShowSocket(var msg:string);
+      procedure ShowDiscoverySocket(var msg:string);
       function ProcessGet(HttpRequest: string): string;
       function ProcessPut(HttpRequest,arg: string): string;
       function ProcessSetup(HttpRequest: string): string;
@@ -73,9 +77,11 @@ type
       procedure AddDevice(devtype:TAlpacaDeviceType; device:T_AlpacaDevice);
       property IPAddr:string read FIPAddr write FIPAddr;
       property IPPort:string read FIPPort write FIPPort;
+      property DiscoveryPort:string read FDiscoveryPort write FDiscoveryPort;
       property onShowError: TStringProc read FShowError write FShowError;
       property onShowMsg: TStringProc read FShowMsg write FShowMsg;
       property onPortMsg: TStringProc read FPortMsg write FPortMsg;
+      property onDiscoveryPortMsg: TStringProc read FDiscoveryPortMsg write FDiscoveryPortMsg;
   end;
 
   const
@@ -101,6 +107,7 @@ begin
   inherited Create(aOwner);
   FIPAddr := '0.0.0.0';
   FIPPort := '11122';
+  FDiscoveryPort := '32227';
   DefaultFormatSettings.DecimalSeparator := '.';
   DefaultFormatSettings.ThousandSeparator := ',';
   DefaultFormatSettings.DateSeparator := '/';
@@ -113,6 +120,11 @@ begin
   TCPDaemon.onProcessGet:=@ProcessGet;
   TCPDaemon.onProcessPut:=@ProcessPut;
   ServerTransactionID := 0;
+  Discovery:=TDiscoveryDaemon.Create;
+  Discovery.onShowError := @ShowError;
+  Discovery.onShowMsg := @ShowMsg;
+  Discovery.onShowSocket := @ShowDiscoverySocket;
+
 end;
 
 destructor  T_AlpacaServer.Destroy;
@@ -146,11 +158,16 @@ begin
   TCPDaemon.IPaddr := FIPAddr;
   TCPDaemon.IPport := FIPPort;
   TCPDaemon.Start;
+  Discovery.IPaddr := FIPAddr;
+  Discovery.IPport := FDiscoveryPort;
+  Discovery.AlpacaPort := FIPPort;
+  Discovery.Start;
 end;
 
 procedure T_AlpacaServer.StopServer;
 begin
   TCPDaemon.Terminate;
+  Discovery.Terminate;
 end;
 
 procedure T_AlpacaServer.ShowError(var msg:string);
@@ -166,6 +183,11 @@ end;
 procedure T_AlpacaServer.ShowSocket(var msg:string);
 begin
    if assigned(FPortMsg) then FPortMsg(msg);
+end;
+
+procedure T_AlpacaServer.ShowDiscoverySocket(var msg:string);
+begin
+   if assigned(FDiscoveryPortMsg) then FDiscoveryPortMsg(msg);
 end;
 
 function T_AlpacaServer.ProcessGet(HttpRequest: string): string;
@@ -437,6 +459,7 @@ var doc: string;
     ErrorMessage:string;
 begin
   params:=TStringlist.Create;
+  try
   DecodeManagementRequest(HttpRequest,method,params,ClientID,ClientTransactionID);
   status:=400;
   doc:='400 - Not found.';
@@ -489,6 +512,9 @@ begin
              +'' + CRLF
              +doc;
     end;
+  finally
+   params.free;
+  end;
 end;
 
 end.

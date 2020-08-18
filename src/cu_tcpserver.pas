@@ -94,6 +94,29 @@ type
     property onProcessPut: TPutCmd read FProcessPut write FProcessPut;
   end;
 
+  TDiscoveryDaemon = class(TThread)
+  private
+    Sock,ReplySock: TUDPBlockSocket;
+    FShowSocket: TStringProc;
+    FShowError: TStringProc;
+    FShowMsg: TStringProc;
+    FIPaddr, FIPport, FAlpacaPort,FDiscoveryStr: string;
+    procedure ShowError;
+    function GetIPport: string;
+  public
+    stoping: boolean;
+    constructor Create;
+    procedure Execute; override;
+    procedure ShowSocket;
+    property IPaddr: string read FIPaddr write FIPaddr;
+    property IPport: string read GetIPport write FIPport;
+    property AlpacaPort: string read FAlpacaPort write FAlpacaPort;
+    property DiscoveryStr: string read FDiscoveryStr write FDiscoveryStr;
+    property onShowError: TStringProc read FShowError write FShowError;
+    property onShowMsg: TStringProc read FShowMsg write FShowMsg;
+    property onShowSocket: TStringProc read FShowSocket write FShowSocket;
+  end;
+
 implementation
 
 {$ifdef darwin}
@@ -440,6 +463,116 @@ begin
     FHttpResult := msgFailed;
   end;
 end;
+
+///////////////// UPD for discovery /////////////////////
+
+constructor TDiscoveryDaemon.Create;
+begin
+  inherited Create(True);
+  ReplySock:=TUDPBlockSocket.Create;
+  FreeOnTerminate := True;
+  FDiscoveryStr:='alpacadiscovery1';
+end;
+
+procedure TDiscoveryDaemon.ShowError;
+var
+  msg: string;
+begin
+  msg := IntToStr(sock.lasterror) + ' ' + sock.GetErrorDesc(sock.lasterror);
+  if assigned(FShowError) then FShowError(msg);
+end;
+
+function TDiscoveryDaemon.GetIPport: string;
+begin
+  if sock=nil then
+    result:=FIPport
+  else begin
+    sock.GetSins;
+    result := IntToStr(sock.GetLocalSinPort);
+  end;
+end;
+
+procedure TDiscoveryDaemon.ShowSocket;
+var
+  locport: string;
+begin
+  sock.GetSins;
+  locport := IntToStr(sock.GetLocalSinPort);
+  if assigned(FShowSocket) then
+    FShowSocket(locport);
+end;
+
+procedure TDiscoveryDaemon.Execute;
+var
+  i: integer;
+  remoteip, remoteport,req, reply: string;
+  data: array[0..1024] of char;
+  p: pointer;
+begin
+  //writetrace('start udp deamon');
+  stoping := False;
+  sock := TUDPBlockSocket.Create;
+  //writetrace('blocksocked created');
+  p:=@data;
+  try
+    with sock do
+    begin
+      //writetrace('create socket');
+      CreateSocket;
+      if lasterror <> 0 then
+        Synchronize(@ShowError);
+      MaxLineLength := 1024;
+      {$ifdef linux}
+      //writetrace('setlinger');
+      setLinger(True, 0);
+      {$endif}
+      if lasterror <> 0 then
+        Synchronize(@ShowError);
+      //writetrace('bind to '+fipaddr+' '+fipport);
+      bind(FIPaddr, FIPport);
+      if lasterror <> 0 then
+        Synchronize(@ShowError);
+      Synchronize(@ShowSocket);
+      //writetrace('start main loop');
+      repeat
+        if stoping or terminated then
+          break;
+        if canread(500) and (not terminated) and (not stoping) then
+        begin
+          if lastError = 0 then
+          begin
+            FillByte(data,1024,0);
+            i:=RecvBuffer(p,1024);
+            if i>0 then begin
+              req:=trim(data);
+              if req=FDiscoveryStr then begin
+                remoteip := GetRemoteSinIP;
+                remoteport := IntToStr(GetRemoteSinPort);
+                ReplySock.Connect(remoteip,remoteport);
+                if lastError = 0 then begin
+                  reply:='{"AlpacaPort":'+FAlpacaPort+'}';
+                  FillByte(data,1024,0);
+                  data:=reply;
+                  ReplySock.SendBuffer(p,length(reply));
+                end;
+              end;
+            end;
+          end
+          else
+            Synchronize(@ShowError);
+        end;
+      until False;
+    end;
+  finally
+    //  Suspended:=true;
+    Sock.CloseSocket;
+    Sock.Free;
+    ReplySock.CloseSocket;
+    ReplySock.Free;
+    //  terminate;
+  end;
+end;
+
 
 initialization
 

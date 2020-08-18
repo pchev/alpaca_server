@@ -7,12 +7,22 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, example_lcl_mainform
+  Forms, example_lcl_mainform, sysutils
   { you can add units after this };
 
 {$R *.res}
 
 begin
+  {$ifdef USEHEAPTRC}
+    {$ifdef mswindows}
+      DeleteFile('C:\Temp\alpaca_example_heap.trc');
+      SetHeapTraceOutput('C:\Temp\alpaca_example_heap.trc');
+    {$else}
+      DeleteFile('/tmp/alpaca_example_heap.trc');
+      SetHeapTraceOutput('/tmp/alpaca_example_heap.trc');
+    {$endif}
+  {$endif}
+
   RequireDerivedFormResource:=True;
   Application.Scaled:=True;
   Application.Initialize;
