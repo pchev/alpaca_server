@@ -364,7 +364,7 @@ end;
 
 procedure TTCPThrd.Execute;
 var
-  req,hdr,body,method: string;
+  req,hdr,body,method,buf: string;
   args:Tstringlist;
 begin
   try
@@ -388,7 +388,9 @@ begin
           begin
             hdr:='';
             repeat
-              hdr:=hdr+crlf+RecvString(1);
+              buf:=RecvString(1);
+              if trim(buf)='' then break;
+              hdr:=hdr+crlf+buf;
             until LastError<>0;
             body:='';
             repeat
