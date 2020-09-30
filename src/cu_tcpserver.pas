@@ -388,11 +388,11 @@ begin
           begin
             hdr:='';
             repeat
-              hdr:=hdr+crlf+RecvString(100);
+              hdr:=hdr+crlf+RecvString(1);
             until LastError<>0;
             body:='';
             repeat
-              body:=body+RecvPacket(100);
+              body:=body+RecvPacket(1);
             until LastError<>0;
             SplitCmdLineParams(req,args);
             method:=uppercase(args[0]);
