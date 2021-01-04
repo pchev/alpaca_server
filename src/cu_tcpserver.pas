@@ -530,6 +530,7 @@ begin
       {$endif}
       if lasterror <> 0 then
         Synchronize(@ShowError);
+      EnableReuse(true);
       //writetrace('bind to '+fipaddr+' '+fipport);
       bind(FIPaddr, FIPport);
       if lasterror <> 0 then
