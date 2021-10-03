@@ -14,7 +14,7 @@
         </OtherDefines>
       </Other>
     </CompilerOptions>
-    <Files Count="5">
+    <Files Count="7">
       <Item1>
         <Filename Value="cu_serial.pas"/>
         <UnitName Value="cu_serial"/>
@@ -28,13 +28,21 @@
         <UnitName Value="cu_alpacadevice"/>
       </Item3>
       <Item4>
-        <Filename Value="cu_alpacatelescope.pas"/>
-        <UnitName Value="cu_alpacatelescope"/>
+        <Filename Value="cu_alpacafocuser.pas"/>
+        <UnitName Value="cu_alpacafocuser"/>
       </Item4>
       <Item5>
         <Filename Value="cu_alpacaserver.pas"/>
         <UnitName Value="cu_alpacaserver"/>
       </Item5>
+      <Item6>
+        <Filename Value="cu_alpacacamera.pas"/>
+        <UnitName Value="cu_alpacacamera"/>
+      </Item6>
+      <Item7>
+        <Filename Value="cu_alpacatelescope.pas"/>
+        <UnitName Value="cu_alpacatelescope"/>
+      </Item7>
     </Files>
     <RequiredPkgs Count="2">
       <Item1>

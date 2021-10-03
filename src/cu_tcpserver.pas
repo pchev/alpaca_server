@@ -31,6 +31,7 @@ interface
 uses
   blcksock, synsock, synautil, cu_alpacadevice,
   SysUtils, Classes;
+ {for blocksock, load in Lazarus synapse.lpk!!!. Then it will compile}
 
 const
   Maxclient=100;

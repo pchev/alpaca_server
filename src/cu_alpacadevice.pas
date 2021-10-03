@@ -37,6 +37,7 @@ type
   end;
   TAxisRates = array of TAxisRate;
   TTrackingRates = array of integer;
+  Timg           = array of array of integer;
 
   TStringProc = procedure(var S: string) of object;
   TIntProc = procedure(var i: integer) of object;
@@ -86,6 +87,9 @@ type
       function  FormatBoolResp(value:boolean; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
       function  FormatIntResp(value:integer; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
       function  FormatIntArrayResp(value:array of integer; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
+
+      function  FormatIntArrayofArrayResp(value:Timg; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
+
       function  FormatFloatResp(value:double; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
       function  FormatAxisRateResp(value:TAxisRates; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
       function  DecodeRequest(req: string; out method: string; var params: TStringlist; out ClientID,ClientTransactionID: Longword):boolean;
@@ -354,6 +358,42 @@ begin
          +'"ErrorNumber":'+inttostr(ErrorNumber)+','
          +'"ErrorMessage":"'+ErrorMessage+'"}'
 end;
+
+
+function  T_AlpacaDevice.FormatIntArrayofArrayResp(value:timg; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
+var buf: string;
+    w,h,i,j: integer;
+begin
+  w:=length(value);
+  h:=length(value[0]);
+  if w=0 then
+    buf:='[]'
+  else begin
+    buf:='[';  {begin mark image}
+    for i:=0 to w-1 do
+    begin
+      buf:=buf+'['; {begin mark each row}
+
+      for j:=0 to h-1 do
+      begin
+        buf:=buf+IntToStr(value[i,j]);
+        if j<h-1 then buf:=buf+',';
+      end;
+      buf:=buf+']'; {end mark each row}
+      if i<w-1 then buf:=buf+',';
+    end;
+    buf:=buf+']'; {end mark image}
+  end;
+  result:='{"Type":2,' {int32}    {0 = Unknown, 1 = Short(int16), 2 = Integer (int32), 3 = Double (Double precision real number).}
+         +'"Rank":2,'  {single plane monochrome} { The array's rank, will be 2 (single plane image (monochrome)) or 3 (multi-plane image)}
+         +'"Value":'
+         +buf+','
+         +'"ClientTransactionID":'+inttostr(ClientTransactionID)+','
+         +'"ServerTransactionID":'+inttostr(ServerTransactionID)+','
+         +'"ErrorNumber":'+inttostr(ErrorNumber)+','
+         +'"ErrorMessage":"'+ErrorMessage+'"}'
+end;
+
 
 function  T_AlpacaDevice.FormatFloatResp(value:double; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
 begin
