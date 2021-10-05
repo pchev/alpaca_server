@@ -178,23 +178,31 @@ begin
 end;
 
 procedure T_AlpacaServer.ShowError(var msg:string);
+var buf:string;
 begin
-   if assigned(FShowError) then FShowError(msg);
+   buf:=copy(msg,1,200);
+   if assigned(FShowError) then FShowError(buf);
 end;
 
 procedure T_AlpacaServer.ShowMsg(var msg:string);
+var buf:string;
 begin
-  if assigned(FShowMsg) then FShowMsg(msg);
+  buf:=copy(msg,1,200);
+  if assigned(FShowMsg) then FShowMsg(buf);
 end;
 
 procedure T_AlpacaServer.ShowSocket(var msg:string);
+var buf:string;
 begin
-   if assigned(FPortMsg) then FPortMsg(msg);
+   buf:=copy(msg,1,200);
+   if assigned(FPortMsg) then FPortMsg(buf);
 end;
 
 procedure T_AlpacaServer.ShowDiscoverySocket(var msg:string);
+var buf:string;
 begin
-   if assigned(FDiscoveryPortMsg) then FDiscoveryPortMsg(msg);
+   buf:=copy(msg,1,200);
+   if assigned(FDiscoveryPortMsg) then FDiscoveryPortMsg(buf);
 end;
 
 function T_AlpacaServer.ProcessGet(HttpRequest: string): string;
