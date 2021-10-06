@@ -379,6 +379,7 @@ procedure TTCPThrd.Execute;
 var
   req,hdr,body,method,buf: string;
   args:Tstringlist;
+  cl: integer;
 begin
   try
     Fsock := TTCPBlockSocket.Create;
@@ -400,15 +401,25 @@ begin
           if lastError = 0 then
           begin
             hdr:='';
+            cl:=-1;
             repeat
-              buf:=RecvString(1);
+              buf:=RecvString(500);
               if trim(buf)='' then break;
               hdr:=hdr+crlf+buf;
+              if Pos('CONTENT-LENGTH:',UpperCase(buf))=1 then begin
+                delete(buf,1,15);
+                cl:=StrToIntDef(trim(buf),0);
+              end;
             until LastError<>0;
             body:='';
-            repeat
-              body:=body+RecvPacket(1);
-            until LastError<>0;
+            if cl>0 then begin
+              body:=RecvBufferStr(cl,500);
+            end
+            else if cl=0 then begin
+              repeat
+                body:=body+RecvPacket(500);
+              until LastError<>0;
+            end;
             SplitCmdLineParams(req,args);
             method:=uppercase(args[0]);
             if method='GET' then begin
