@@ -60,7 +60,7 @@ begin
   AlpacaServer.onPortMsg:=@PortMsg;
   AlpacaServer.onDiscoveryPortMsg:=@DiscoveryPortMsg;
 
-  MyDriver:=T_Alpaca_Example.Create(self);
+  MyDriver:=T_Alpaca_Example.Create(nil);
   AlpacaServer.AddDevice(telescope,MyDriver);
 
   AlpacaServer.IPAddr:=AlpacaIPAddr;
