@@ -34,6 +34,7 @@ type
       constructor Create(AOwner: TComponent);override;
       destructor  Destroy; override;
       function  ProcessGetRequest(req: string; ServerTransactionID:LongWord; out status: integer):string; override;
+      function  ProcessGetImageBytesRequest(req: string; ServerTransactionID:LongWord; out status: integer; var s:TMemoryStream):string; override;
       function  ProcessPutRequest(req,arg: string; ServerTransactionID:LongWord; out status: integer):string; override;
       function  ProcessSetup(req: string; out status: integer):string; override;
       function  GetSetupPage: string; virtual; abstract;
@@ -246,6 +247,34 @@ begin
   params.Free;
 end;
 
+function T_AlpacaCamera.ProcessGetImageBytesRequest(req: string; ServerTransactionID:LongWord; out status: integer; var s:TMemoryStream):string;
+var method,value: string;
+    ok: boolean;
+    lst:TStringList;
+    x,ra,dec: double;
+    params: TStringlist;
+    i: integer;
+    img: timg;
+    ClientID,ClientTransactionID:Longword;
+begin
+  params:=TStringlist.Create;
+  DecodeRequest(req,method,params,ClientID,ClientTransactionID);
+  status:=200;
+  FErrorNumber:=0;
+  FErrorMessage:='';
+  ok:=false; i:=0; value:='';
+  // Only valid method is imagearray
+  if method='imagearray' then begin
+    img:=imagearray;
+    result:= FormatImageBytesResp(img,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage,s);
+  end
+  else begin
+    result:='GET - Method invalid for ImageBytes: '+method;
+    status:=400;
+  end;
+  params.Free;
+end;
+
 function  T_AlpacaCamera.ProcessPutRequest(req,arg: string; ServerTransactionID:LongWord; out status: integer):string;
 var method,p1,p2,value: string;
     ok,bvalue: boolean;
@@ -318,8 +347,6 @@ begin
       startexposure(x);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
-
-//  curl -X PUT "https://virtserver.swaggerhub.com/ASCOMInitiative/api/v1/camera/0/setccdtemperature" -H  "accept: application/json" -H  "Content-Type: application/x-www-form-urlencoded" -d "SetCCDTemperature=-10&ClientID=&ClientTransactionID="
   else if method='setccdtemperature' then begin
     if GetParamFloat(params,'SetCCDTemperature',x)  then
       SetCCDTemperature(x);

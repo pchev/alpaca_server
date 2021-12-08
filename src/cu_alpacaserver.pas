@@ -66,6 +66,7 @@ type
       procedure ShowSocket(var msg:string);
       procedure ShowDiscoverySocket(var msg:string);
       function ProcessGet(HttpRequest: string): string;
+      function ProcessGetImageBytes(HttpRequest: string; var s: TMemoryStream): string;
       function ProcessPut(HttpRequest,arg: string): string;
       function ProcessSetup(HttpRequest: string): string;
       function ProcessManagement(HttpRequest: string): string;
@@ -89,7 +90,7 @@ type
   end;
 
   const
-    server_version='1.0.0';
+    server_version='1.0.1';
 
 implementation
 
@@ -125,6 +126,7 @@ begin
   TCPDaemon.onShowMsg := @ShowMsg;
   TCPDaemon.onShowSocket := @ShowSocket;
   TCPDaemon.onProcessGet:=@ProcessGet;
+  TCPDaemon.onProcessGetImageBytes:=@ProcessGetImageBytes;
   TCPDaemon.onProcessPut:=@ProcessPut;
   ServerTransactionID := 0;
   Discovery:=TDiscoveryDaemon.Create;
@@ -135,8 +137,14 @@ begin
 end;
 
 destructor  T_AlpacaServer.Destroy;
+var i: integer;
 begin
-  DeviceList.Free;
+  if DeviceList<>nil then begin
+    for i:=0 to DeviceList.Count-1 do begin
+       T_AlpacaDeviceElement(DeviceList.Items[i]).device.Free;
+    end;
+    DeviceList.Free;
+  end;
 end;
 
 procedure T_AlpacaServer.AddDevice(devtype:TAlpacaDeviceType; device:T_AlpacaDevice);
@@ -280,6 +288,70 @@ begin
              +doc + CRLF;
     end;
   end;
+end;
+
+function T_AlpacaServer.ProcessGetImageBytes(HttpRequest: string; var s: TMemoryStream): string;
+var req,doc: string;
+    i,p,n,httpstatus: integer;
+begin
+  try
+  req:=HttpRequest;
+  n:=-1;
+  for i:=0 to DeviceList.Count-1 do begin
+    p:=pos(DeviceList[i].devicepath,req);
+    if p>0 then begin
+      n:=i;
+      Delete(req,1,p-1);
+      break;
+    end;
+  end;
+  if n>=0 then begin
+  inc(ServerTransactionID);
+  doc:=DeviceList[n].device.ProcessGetImageBytesRequest(req,ServerTransactionID,httpstatus,s) + CRLF;
+  if httpstatus=200 then begin
+  result:='HTTP/1.0 200' + CRLF
+         +'Connection: close' + CRLF
+         +'Content-length: ' + IntTostr(s.Size) + CRLF
+         +'Content-type: application/imagebytes' + CRLF
+         +'Date: ' + Rfc822DateTime(now) + CRLF
+         +'Server: ' + FServerName + CRLF
+         +'' + CRLF;
+  end
+  else begin
+    result:='HTTP/1.0 '+inttostr(httpstatus) + CRLF
+           +'Connection: close' + CRLF
+           +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
+           +'Content-type: text/html; charset=utf-8' + CRLF
+           +'Date: ' + Rfc822DateTime(now) + CRLF
+           +'Server: ' + FServerName + CRLF
+           +'' + CRLF
+           +doc;
+  end;
+end
+else begin
+  doc:='400 - Not found.';
+  ShowMsg(doc);
+  result:='HTTP/1.0 400' + CRLF
+         +'Connection: close' + CRLF
+         +'Content-type: text/html; charset=utf-8' + CRLF
+         +'Date: ' + Rfc822DateTime(now) + CRLF
+         +'Server: ' + FServerName + CRLF
+         +'' + CRLF
+         +doc + CRLF;
+end;
+except
+  on E: Exception do begin
+    doc:='500 - '+E.Message;
+    ShowMsg(doc);
+    result:='HTTP/1.0 500' + CRLF
+           +'Connection: close' + CRLF
+           +'Content-type: text/html; charset=utf-8' + CRLF
+           +'Date: ' + Rfc822DateTime(now) + CRLF
+           +'Server: ' + FServerName + CRLF
+           +'' + CRLF
+           +doc + CRLF;
+  end;
+end;
 end;
 
 function T_AlpacaServer.ProcessPut(HttpRequest,arg: string): string;

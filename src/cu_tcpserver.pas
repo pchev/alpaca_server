@@ -46,9 +46,11 @@ type
     FHttpRequest: string;
     FBody: string;
     FHttpResult: string;
+    FImageBytes: TMemoryStream;
     FConnectTime: double;
     FTerminate: TIntProc;
     FProcessGet: TGetCmd;
+    FProcessGetImageBytes: TGetImageBytes;
     FProcessPut: TPutCmd;
   public
     id: integer;
@@ -59,12 +61,14 @@ type
     procedure Execute; override;
     procedure SendData(str: string);
     procedure ProcessGet;
+    procedure ProcessGetImageBytes;
     procedure ProcessPut;
     property sock: TTCPBlockSocket read FSock;
     property ConnectTime: double read FConnectTime;
     property Terminated;
     property onTerminate: TIntProc read FTerminate write FTerminate;
     property onProcessGet: TGetCmd read FProcessGet write FProcessGet;
+    property onProcessGetImageBytes: TGetImageBytes read FProcessGetImageBytes write FProcessGetImageBytes;
     property onProcessPut: TPutCmd read FProcessPut write FProcessPut;
   end;
 
@@ -76,6 +80,7 @@ type
     FShowSocket: TStringProc;
     FIPaddr, FIPport: string;
     FProcessGet: TGetCmd;
+    FProcessGetImageBytes: TGetImageBytes;
     FProcessPut: TPutCmd;
     procedure ShowError;
     procedure ThrdTerminate(var i: integer);
@@ -93,6 +98,7 @@ type
     property onShowMsg: TStringProc read FShowMsg write FShowMsg;
     property onShowSocket: TStringProc read FShowSocket write FShowSocket;
     property onProcessGet: TGetCmd read FProcessGet write FProcessGet;
+    property onProcessGetImageBytes: TGetImageBytes read FProcessGetImageBytes write FProcessGetImageBytes;
     property onProcessPut: TPutCmd read FProcessPut write FProcessPut;
   end;
 
@@ -317,6 +323,7 @@ begin
               TCPThrd[n] := TTCPThrd.Create(ClientSock);
               TCPThrd[n].onTerminate := @ThrdTerminate;
               TCPThrd[n].onProcessGet := FProcessGet;
+              TCPThrd[n].onProcessGetImageBytes := FProcessGetImageBytes;
               TCPThrd[n].onProcessPut := FProcessPut;
               TCPThrd[n].id := n;
               ThrdActive[n] := True;
@@ -362,6 +369,7 @@ begin
   Csock := Hsock;
   abort := False;
   id:=-1;
+  FImageBytes:=TMemoryStream.Create;
 end;
 
 destructor TTCPThrd.Destroy;
@@ -372,6 +380,8 @@ begin
   end;
   if assigned(FTerminate) then
     FTerminate(id);
+  if FImageBytes<>nil then
+    FImageBytes.Free;
   inherited Destroy;
 end;
 
@@ -380,6 +390,7 @@ var
   req,hdr,body,method,buf: string;
   args:Tstringlist;
   cl: integer;
+  imagebytes: boolean;
 begin
   try
     Fsock := TTCPBlockSocket.Create;
@@ -402,30 +413,46 @@ begin
           begin
             hdr:='';
             cl:=-1;
+            imagebytes := False;
             repeat
-              buf:=RecvString(500);
+              buf:=RecvString(100);
               if trim(buf)='' then break;
               hdr:=hdr+crlf+buf;
               if Pos('CONTENT-LENGTH:',UpperCase(buf))=1 then begin
                 delete(buf,1,15);
                 cl:=StrToIntDef(trim(buf),0);
               end;
+              if Pos('ACCEPT:',UpperCase(buf))=1 then begin
+                delete(buf,1,7);
+                imagebytes:=pos('APPLICATION/IMAGEBYTES',UpperCase(trim(buf)))>0;
+              end;
             until LastError<>0;
             body:='';
             if cl>0 then begin
-              body:=RecvBufferStr(cl,500);
+              body:=RecvBufferStr(cl,100);
             end
             else if cl=0 then begin
               repeat
-                body:=body+RecvPacket(500);
+                body:=body+RecvPacket(100);
               until LastError<>0;
             end;
             SplitCmdLineParams(req,args);
             method:=uppercase(args[0]);
             if method='GET' then begin
                FHttpRequest:=args[1];
-               Synchronize(@ProcessGet);
-               SendString(FHttpResult);
+               if imagebytes then begin
+                 // imagearray imagebytes request
+                 Synchronize(@ProcessGetImageBytes);
+                 SendString(FHttpResult);
+                 SendStreamRaw(FImageBytes);
+                 FImageBytes.Clear;
+               end
+               else begin
+                 // all other request
+                 Synchronize(@ProcessGet);
+                 ProcessGet;
+                 SendString(FHttpResult);
+               end;
             end
             else if method='PUT' then begin
                FHttpRequest:=args[1];
@@ -465,6 +492,17 @@ begin
     FHttpResult:='';
     if Assigned(FProcessGet) then
       FHttpResult := FProcessGet(FHttpRequest);
+  except
+    FHttpResult := msgFailed;
+  end;
+end;
+
+procedure TTCPThrd.ProcessGetImageBytes;
+begin
+  try
+    FHttpResult:='';
+    if Assigned(FProcessGetImageBytes) then
+      FHttpResult := FProcessGetImageBytes(FHttpRequest,FImageBytes);
   except
     FHttpResult := msgFailed;
   end;

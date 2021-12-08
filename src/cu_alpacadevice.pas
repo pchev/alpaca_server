@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 interface
 
-uses
+uses  ctypes,
   Classes, SysUtils;
 
 type
@@ -39,9 +39,26 @@ type
   TTrackingRates = array of integer;
   Timg           = array of array of integer;
 
+  // ImageBytes support, from Alpaca documentation
+  TArrayUInt16 = array of cuint16;
+  TImageBytesInfo = record
+    MetadataVersion: cint;         // Bytes 0..3 - Metadata version = 1
+    ErrorNumber: cint;             // Bytes 4..7 - Alpaca error number or zero for success
+    ClientTransactionID: cuint;    // Bytes 8..11 - Client's transaction ID
+    ServerTransactionID: cuint;    // Bytes 12..15 - Device's transaction ID
+    DataStart: cint;               // Bytes 16..19 - Offset of the start of the data bytes = 36 for version 1
+    ImageElementType: cint;        // Bytes 20..23 - Element type of the source image array
+    TransmissionElementType: cint; // Bytes 24..27 - Element type as sent over the network
+    Rank: cint;                    // Bytes 28..31 - Image array rank
+    Dimension1: cint;              // Bytes 32..35 - Length of image array first dimension
+    Dimension2: cint;              // Bytes 36..39 - Length of image array second dimension
+    Dimension3: cint;              // Bytes 40..43 - Length of image array third dimension (0 for 2D array)
+  end;
+
   TStringProc = procedure(var S: string) of object;
   TIntProc = procedure(var i: integer) of object;
   TGetCmd = function(cmd: string): string of object;
+  TGetImageBytes = function(cmd: string; var s: TMemoryStream):string  of object;
   TPutCmd = function(cmd,arg: string): string of object;
 
 
@@ -89,6 +106,7 @@ type
       function  FormatIntArrayResp(value:array of integer; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
 
       function  FormatIntArrayofArrayResp(value:Timg; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
+      function  FormatImageBytesResp(value:Timg; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string; var s:TMemoryStream):string;
 
       function  FormatFloatResp(value:double; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
       function  FormatAxisRateResp(value:TAxisRates; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
@@ -99,6 +117,7 @@ type
       function  GetParamFloat(params: Tstringlist; key: string; out value: double):boolean;
       function  GetParamInt(params: Tstringlist; key: string; out value: integer):boolean;
       function  ProcessGetRequest(req: string; ServerTransactionID:LongWord; out status: integer):string; virtual; abstract;
+      function  ProcessGetImageBytesRequest(req: string; ServerTransactionID:LongWord; out status: integer; var s:TMemoryStream):string; virtual;
       function  ProcessPutRequest(req,arg: string; ServerTransactionID:LongWord; out status: integer):string; virtual; abstract;
       function  ProcessSetup(req: string; out status: integer):string; virtual; abstract;
       function  GetGuid: string; virtual; abstract;
@@ -394,6 +413,41 @@ begin
          +'"ErrorMessage":"'+ErrorMessage+'"}'
 end;
 
+function  T_AlpacaDevice.FormatImageBytesResp(value:Timg; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string; var s:TMemoryStream):string;
+var metadata: TImageBytesInfo;
+    data: TArrayUInt16;
+    i,j,n: integer;
+begin
+  // Fill metadata
+  metadata.MetadataVersion:=1;
+  metadata.ErrorNumber:=0;
+  metadata.ClientTransactionID:=ClientTransactionID;
+  metadata.ServerTransactionID:=ServerTransactionID;
+  metadata.DataStart:=sizeof(metadata);
+  metadata.ImageElementType:=2;
+  metadata.TransmissionElementType:=8;
+  metadata.Rank:=2;
+  metadata.Dimension1:=length(value);
+  metadata.Dimension2:=length(value[0]);
+  metadata.Dimension3:=0;
+  // write metadata to stream
+  s.Position:=0;
+  s.Write(metadata,sizeof(metadata));
+  SetLength(data,metadata.Dimension1*metadata.Dimension2);
+  // write image to sequential array
+  n:=0;
+  for i:=0 to metadata.Dimension1-1 do
+    for j:=0 to metadata.Dimension2-1 do
+    begin
+      data[n]:=value[i,j];
+      inc(n);
+    end;
+  // write image to stream
+  s.Write(data[0],metadata.Dimension1*metadata.Dimension2*sizeof(cuint16));
+  s.Position:=0;
+  // empty result text
+  result:='';
+end;
 
 function  T_AlpacaDevice.FormatFloatResp(value:double; ClientTransactionID, ServerTransactionID: LongWord; ErrorNumber: integer; ErrorMessage:string):string;
 begin
@@ -446,6 +500,12 @@ end;
 arg.add(buf);
 end;
 
+function T_AlpacaDevice.ProcessGetImageBytesRequest(req: string; ServerTransactionID:LongWord; out status: integer; var s:TMemoryStream):string;
+begin
+ // default for devices other than camera
+ result:='GET - ImageBytes not implemented';
+ status:=400;
+end;
 
 end.
 
