@@ -73,8 +73,12 @@ type
       function  ccdtemperature: double; virtual; abstract;
       function  exposuremax: double; virtual; abstract;
       function  exposuremin: double; virtual; abstract;
-      procedure abortexposure; virtual; abstract;
+      function  electronsperadu: double; virtual; abstract;
+      function  gain: double; virtual; abstract;
+      function  gainmax: double; virtual; abstract;
+      function  gainmin: double; virtual; abstract;
 
+      procedure abortexposure; virtual; abstract;
       procedure startexposure(duration: double); virtual; abstract;
       procedure setCcdTemperature(duration: double); virtual; abstract;
       function  imagearray : Timg; virtual; abstract;
@@ -236,6 +240,22 @@ begin
   end
   else if method='exposuremin' then begin
     x:=exposuremin;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='electronsperadu' then begin
+    x:=electronsperadu;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='gain' then begin
+    x:=gain;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='gainmax' then begin
+    x:=gainmax;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='gainmin' then begin
+    x:=gainmin;
     result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='imagearray' then begin
