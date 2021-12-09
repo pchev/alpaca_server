@@ -295,6 +295,8 @@ var req,doc: string;
     i,p,n,httpstatus: integer;
 begin
   try
+  doc:='GET '+HttpRequest+' format: ImageBytes';
+  ShowMsg(doc);
   req:=HttpRequest;
   n:=-1;
   for i:=0 to DeviceList.Count-1 do begin

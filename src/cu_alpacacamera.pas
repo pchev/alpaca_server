@@ -63,6 +63,10 @@ type
       function  cangetcoolerpower: boolean; virtual; abstract;
       function  cansetccdtemperature: boolean; virtual; abstract;
       function  canfastreadout: boolean; virtual; abstract;
+      function  canpulseguide: boolean; virtual; abstract;
+      function  canabortexposure: boolean; virtual; abstract;
+      function  canstopexposure: boolean; virtual; abstract;
+      function  canasymmetricbin: boolean; virtual; abstract;
       function  cooleron: boolean; virtual; abstract;
       function  imageready: boolean; virtual; abstract;
 
@@ -238,8 +242,22 @@ begin
     img:=imagearray;
     result:= FormatIntArrayofArrayResp(img,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
-
-
+  else if method='canpulseguide' then begin
+    ok:=canpulseguide;
+    result:= FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='canabortexposure' then begin
+    ok:=canabortexposure;
+    result:= FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='canstopexposure' then begin
+    ok:=canstopexposure;
+    result:= FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='canasymmetricbin' then begin
+    ok:=canasymmetricbin;
+    result:= FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
   else begin
     result:='GET - Unknown device method: '+method;
     status:=400;
