@@ -450,7 +450,6 @@ begin
                else begin
                  // all other request
                  Synchronize(@ProcessGet);
-                 ProcessGet;
                  SendString(FHttpResult);
                end;
             end
