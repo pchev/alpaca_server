@@ -562,7 +562,7 @@ var
   s,buf: string;
   ip1,ip2:dword;
   sl: TStringList;
-  i,k,n: integer;
+  i,k,n,l: integer;
   {$IFDEF WINDOWS}
   j: integer;
   ip,mask: string;
@@ -631,17 +631,21 @@ begin
   end;
   for i:=0 to sl.Count-1 do
   begin
-    n:=Pos('inet ', sl[i]);
+    l:=10;
+    n:=Pos('inet addr:', sl[i]);
+    if n=0 then begin n:=Pos('inet ', sl[i]); l:=5; end;
     if n=0 then Continue;
     s:=sl[i];
-    buf:=Copy(s, n+Length('inet '), 999);
+    buf:=Copy(s, n+l, 999);
     n:=Pos(' ', buf);
     if n>0 then buf:=Copy(buf, 1, n);
     ip2:=StrToIp(buf);
     if ip2=ip1 then begin
+      l:=8;
       n:=Pos('netmask ', s);
+      if n=0 then begin n:=Pos('Mask:', s); l:=5; end;
       if n=0 then Continue;
-      buf:=Copy(s, n+Length('netmask '), 999);
+      buf:=Copy(s, n+l, 999);
       n:=Pos(' ', buf);
       if n>0 then buf:=Copy(buf, 1, n);
       result:=StrToIp(buf);
