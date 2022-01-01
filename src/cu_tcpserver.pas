@@ -658,6 +658,7 @@ begin
     for i:=0 to sl.Count-1 do
       buf:=buf+sl[i];
     jl:=GetJSON(buf);
+    try
     for i:=0 to jl.Count-1 do begin
       ja:=jl.Items[i].FindPath('addr_info');
       if ja<>nil then for j:=0 to ja.Count-1 do begin
@@ -676,6 +677,9 @@ begin
           end;
         end;
       end;
+    end;
+    finally
+      jl.Free;
     end;
   end
   else begin
