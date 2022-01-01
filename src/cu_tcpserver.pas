@@ -30,7 +30,7 @@ interface
 
 uses
   blcksock, synsock, synautil, synaip, cu_alpacadevice,
-  process, SysUtils, Classes;
+  process, fpjson, jsonparser, SysUtils, Classes;
 
 const
   Maxclient=100;
@@ -559,19 +559,20 @@ end;
 function TDiscoveryDaemon.GetMask(addr:string): dword;
 var
   AProcess: TProcess;
+  processok: boolean;
   s,buf: string;
-  ip1,ip2:dword;
+  ip1,ip2,pl:dword;
   sl: TStringList;
-  i,k,n,l: integer;
+  jl,ja: TJSONData;
+  i,j,k,n,l: integer;
   {$IFDEF WINDOWS}
-  j: integer;
   ip,mask: string;
   b,b1,b2: byte;
   hasIP, hasMask: boolean;
   {$ENDIF}
 begin
+  result:=$0;
   if addr=cAnyHost then begin
-    result:=$0;
     exit;
   end;
   if copy(addr,1,3)='127' then begin
@@ -619,37 +620,87 @@ begin
   end;
   {$ENDIF}
   {$IFDEF UNIX}
+  // Try to use ip
   AProcess:=TProcess.Create(nil);
-  AProcess.Executable := '/sbin/ifconfig';
-  AProcess.Parameters.Add('-a');
+  AProcess.Executable := '/bin/ip';
+  AProcess.Parameters.Add('-json');
+  AProcess.Parameters.Add('address');
   AProcess.Options := AProcess.Options + [poUsePipes, poWaitOnExit];
   try
+    try
     AProcess.Execute();
+    processok:=(AProcess.ExitStatus=0);
+    except
+      processok:=false;
+    end;
     sl.LoadFromStream(AProcess.Output);
   finally
     AProcess.Free();
   end;
-  for i:=0 to sl.Count-1 do
-  begin
-    l:=10;
-    n:=Pos('inet addr:', sl[i]);
-    if n=0 then begin n:=Pos('inet ', sl[i]); l:=5; end;
-    if n=0 then Continue;
-    s:=sl[i];
-    buf:=Copy(s, n+l, 999);
-    n:=Pos(' ', buf);
-    if n>0 then buf:=Copy(buf, 1, n);
-    ip2:=StrToIp(buf);
-    if ip2=ip1 then begin
-      l:=8;
-      n:=Pos('netmask ', s);
-      if n=0 then begin n:=Pos('Mask:', s); l:=5; end;
+  if processok then begin
+    buf:='';
+    for i:=0 to sl.Count-1 do
+      buf:=buf+sl[i];
+    jl:=GetJSON(buf);
+    for i:=0 to jl.Count-1 do begin
+      ja:=jl.Items[i].FindPath('addr_info');
+      if ja<>nil then for j:=0 to ja.Count-1 do begin
+        if ja.Items[j].FindPath('family')=nil then Continue;
+        buf:=ja.Items[j].FindPath('family').AsString;
+        if buf='inet' then begin
+          if ja.Items[j].FindPath('local')=nil then Continue;
+          buf:=ja.Items[j].FindPath('local').AsString;
+          ip2:=StrToIp(buf);
+          if ip2=ip1 then begin
+            if ja.Items[j].FindPath('prefixlen')=nil then Continue;
+            buf:=ja.Items[j].FindPath('prefixlen').AsString;
+            pl:=strtoint(buf);
+            k:=32-pl;
+            result:=($ffffffff shr k) shl k;
+          end;
+        end;
+      end;
+    end;
+  end
+  else begin
+    // try to use ifconfig
+    AProcess:=TProcess.Create(nil);
+    AProcess.Executable := '/sbin/ifconfig';
+    AProcess.Parameters.Add('-a');
+    AProcess.Options := AProcess.Options + [poUsePipes, poWaitOnExit];
+    try
+      try
+      AProcess.Execute();
+      processok:=(AProcess.ExitStatus=0);
+      except
+        processok:=false;
+      end;
+      sl.LoadFromStream(AProcess.Output);
+    finally
+      AProcess.Free();
+    end;
+    for i:=0 to sl.Count-1 do
+    begin
+      l:=10;
+      n:=Pos('inet addr:', sl[i]);
+      if n=0 then begin n:=Pos('inet ', sl[i]); l:=5; end;
       if n=0 then Continue;
+      s:=sl[i];
       buf:=Copy(s, n+l, 999);
       n:=Pos(' ', buf);
       if n>0 then buf:=Copy(buf, 1, n);
-      result:=StrToIp(buf);
-      break;
+      ip2:=StrToIp(buf);
+      if ip2=ip1 then begin
+        l:=8;
+        n:=Pos('netmask ', s);
+        if n=0 then begin n:=Pos('Mask:', s); l:=5; end;
+        if n=0 then Continue;
+        buf:=Copy(s, n+l, 999);
+        n:=Pos(' ', buf);
+        if n>0 then buf:=Copy(buf, 1, n);
+        result:=StrToIp(buf);
+        break;
+      end;
     end;
   end;
   {$ENDIF}
