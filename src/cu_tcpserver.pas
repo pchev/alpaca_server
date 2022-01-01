@@ -29,6 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 interface
 
 uses
+  {$IFDEF WINDOWS}
+  Variants, comobj, ActiveX,
+  {$ENDIF}
   blcksock, synsock, synautil, synaip, cu_alpacadevice,
   process, fpjson, jsonparser, SysUtils, Classes;
 
@@ -108,6 +111,8 @@ type
     FShowError: TStringProc;
     FShowMsg: TStringProc;
     FIPaddr, FIPport, FAlpacaPort,FDiscoveryStr: string;
+    servermask,serverip: dword;
+    procedure SetIPaddr(value:string);
     procedure ShowError;
     function GetIPport: string;
     function GetMask(addr:string): dword;
@@ -116,7 +121,7 @@ type
     constructor Create;
     procedure Execute; override;
     procedure ShowSocket;
-    property IPaddr: string read FIPaddr write FIPaddr;
+    property IPaddr: string read FIPaddr write SetIPaddr;
     property IPport: string read GetIPport write FIPport;
     property AlpacaPort: string read FAlpacaPort write FAlpacaPort;
     property DiscoveryStr: string read FDiscoveryStr write FDiscoveryStr;
@@ -558,17 +563,28 @@ end;
 
 function TDiscoveryDaemon.GetMask(addr:string): dword;
 var
+  ip1,ip2:dword;
+  sl: TStringList;
+  i: integer;
+  {$IFDEF UNIX}
   AProcess: TProcess;
   processok: boolean;
   s,buf: string;
-  ip1,ip2,pl:dword;
-  sl: TStringList;
   jl,ja: TJSONData;
-  i,j,k,n,l: integer;
+  j,k,n,l: integer;
+  pl:dword;
+  {$ENDIF}
   {$IFDEF WINDOWS}
+  FSWbemLocator : OLEVariant;
+  FWMIService   : OLEVariant;
+  FWbemObjectSet: OLEVariant;
+  FWbemObject   : OLEVariant;
+  oEnum         : IEnumvariant;
+  iValue        : LongWord;
   ip,mask: string;
-  b,b1,b2: byte;
   hasIP, hasMask: boolean;
+const
+  wbemFlagForwardOnly = $00000020;
   {$ENDIF}
 begin
   result:=$0;
@@ -582,41 +598,41 @@ begin
   ip1:=StrToIp(addr);
   sl:=TStringList.Create();
   {$IFDEF WINDOWS}
-  AProcess:=TProcess.Create(nil);
-  AProcess.Executable := 'ipconfig.exe';
-  AProcess.Options := AProcess.Options + [poUsePipes, poNoConsole];
-  try
-    AProcess.Execute();
-    Sleep(500); // poWaitOnExit not working as expected
-    sl.LoadFromStream(AProcess.Output);
-  finally
-    AProcess.Free();
-  end;
-  hasIP:=false;
-  hasMask:=false;
-  for i:=0 to sl.Count-1 do //!response text are localized!
+  FSWbemLocator := CreateOleObject('WbemScripting.SWbemLocator');
+  FWMIService   := FSWbemLocator.ConnectServer('localhost', 'root\CIMV2', '', '');
+  FWbemObjectSet:= FWMIService.ExecQuery('SELECT IPAddress,IPSubnet FROM Win32_NetworkAdapterConfiguration','WQL',wbemFlagForwardOnly);
+  oEnum         := IUnknown(FWbemObjectSet._NewEnum) as IEnumVariant;
+  // loop all interfaces
+  while oEnum.Next(1, FWbemObject, iValue) = 0 do
   begin
-    if (Pos('IPv4', sl[i])>0) or (Pos('IP-', sl[i])>0) or (Pos('IP Address', sl[i])>0) then begin
-      s:=sl[i];
-      ip:=Trim(Copy(s, Pos(':', s)+1, 999));
-      if Pos(':', ip)>0 then Continue; // TODO: IPv6
-      hasIP:=true;
-    end;
-    if (Pos('Mask', sl[i])>0) or (Pos(': 255', sl[i])>0) then begin
-      s:=sl[i];
-      mask:=Trim(Copy(s, Pos(':', s)+1, 999));
-      if Pos(':', mask)>0 then Continue; // TODO: IPv6
-      hasMask:=true;
-    end;
-    if hasIP and hasMask then begin
-      ip2:=StrToIp(ip);
-      if ip2=ip1 then begin
-        result:=StrToIp(mask);
+    hasIP:=false;
+    hasMask:=false;
+    if not VarIsClear(FWbemObject.IPAddress) and not VarIsNull(FWbemObject.IPAddress) then begin
+     // this interface address is assigned
+     for i := VarArrayLowBound(FWbemObject.IPAddress, 1) to VarArrayHighBound(FWbemObject.IPAddress, 1) do begin
+       ip:=String(FWbemObject.IPAddress[i]);
+       if pos(':',ip)>0 then continue; // TODO: IPv6
+       hasIP:=true;
+       break;
+     end;
+     if not VarIsClear(FWbemObject.IPSubnet) and not VarIsNull(FWbemObject.IPSubnet) then begin
+      // mask assigned
+      for i := VarArrayLowBound(FWbemObject.IPSubnet, 1) to VarArrayHighBound(FWbemObject.IPSubnet, 1) do begin
+        mask:=String(FWbemObject.IPSubnet[i]);
+        if pos('.',mask)=0 then continue; // TODO: IPv6
+        hasMask:=true;
         break;
       end;
-      hasIP:=false;
-      hasMask:=false;
+     end;
+     if hasIP and hasMask then begin
+       ip2:=StrToIp(ip);
+       if ip2=ip1 then begin
+         result:=StrToIp(mask);
+         break;
+       end;
+     end;
     end;
+    FWbemObject:=Unassigned;
   end;
   {$ENDIF}
   {$IFDEF UNIX}
@@ -707,17 +723,21 @@ begin
   sl.Free();
 end;
 
+procedure TDiscoveryDaemon.SetIPaddr(value:string);
+begin
+  FIPaddr:=value;
+  serverip:=StrToIp(FIPaddr);
+  servermask:=GetMask(FIPaddr);
+end;
+
 procedure TDiscoveryDaemon.Execute;
 var
   i: integer;
   remoteip, remoteport,req, reply: string;
   data: array[0..1024] of char;
   p: pointer;
-  mask,serverip,testip: dword;
-  ok: boolean;
+  testip: dword;
 begin
-  serverip:=StrToIp(FIPaddr);
-  mask:=GetMask(FIPaddr);
   //writetrace('start udp deamon');
   stoping := False;
   sock := TUDPBlockSocket.Create;
@@ -757,7 +777,7 @@ begin
               if req=FDiscoveryStr then begin
                 remoteip := GetRemoteSinIP;
                 testip:=StrToIp(remoteip);
-                if (serverip and mask)=(testip and mask) then begin
+                if (serverip and servermask)=(testip and servermask) then begin
                   // reply only if client is on right subnet for this interface
                   remoteport := IntToStr(GetRemoteSinPort);
                   ReplySock.Connect(remoteip,remoteport);
