@@ -718,7 +718,14 @@ begin
         buf:=Copy(s, n+l, 999);
         n:=Pos(' ', buf);
         if n>0 then buf:=Copy(buf, 1, n);
-        result:=StrToIp(buf);
+        buf:=trim(buf);
+        if copy(buf,1,2)='0x' then begin
+          buf:=copy(buf,3,99);
+          result:=StrToInt('$'+trim(buf));
+        end
+        else begin
+          result:=StrToIp(buf);
+        end;
         break;
       end;
     end;
