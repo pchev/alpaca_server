@@ -46,7 +46,7 @@
     </Files>
     <RequiredPkgs Count="2">
       <Item1>
-        <PackageName Value="synapse"/>
+        <PackageName Value="laz_synapse"/>
       </Item1>
       <Item2>
         <PackageName Value="FCL"/>
