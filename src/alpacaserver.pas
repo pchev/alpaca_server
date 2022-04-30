@@ -8,8 +8,7 @@ unit alpacaserver;
 interface
 
 uses
-  cu_serial, cu_tcpserver, cu_alpacadevice, cu_alpacafocuser, cu_alpacaserver, 
-  cu_alpacacamera, cu_alpacatelescope, LazarusPackageIntf;
+  cu_serial, cu_tcpserver, cu_alpacadevice, cu_alpacafocuser, cu_alpacaserver, cu_alpacacamera, cu_alpacatelescope, cu_alpacarotator, LazarusPackageIntf;
 
 implementation
 

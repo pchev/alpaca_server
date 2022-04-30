@@ -45,7 +45,6 @@ type
       function  athome: boolean; virtual; abstract;
       function  atpark: boolean; virtual; abstract;
       function  azimuth: double; virtual; abstract;
-      function  canfindhome: boolean; virtual; abstract;
       function  canpark: boolean; virtual; abstract;
       function  canunpark: boolean; virtual; abstract;
       function  canpulseguide: boolean; virtual; abstract;
@@ -60,6 +59,7 @@ type
       function  canslewaltazasync: boolean; virtual; abstract;
       function  canslewasync: boolean; virtual; abstract;
       function  cansync: boolean; virtual; abstract;
+      function  canfindhome: boolean; virtual; abstract;
       function  cansyncaltaz: boolean; virtual; abstract;
       function  declination: double; virtual; abstract;
       function  declinationrate: double; virtual; abstract;
@@ -76,22 +76,23 @@ type
       function  rightascension: double; virtual; abstract;
       function  rightascensionrate: double; virtual; abstract;
       procedure setrightascensionrate(value: double); virtual; abstract;
+      function  siderealtime: double; virtual; abstract;
       function  sideofpier: integer; virtual; abstract;
       procedure setsideofpier(value: integer); virtual; abstract;
-      function  siderealtime: double; virtual; abstract;
       function  siteelevation: double; virtual; abstract;
       procedure setsiteelevation(value: double); virtual; abstract;
       function  sitelatitude: double; virtual; abstract;
       procedure setsitelatitude(value: double); virtual; abstract;
       function  sitelongitude: double; virtual; abstract;
       procedure setsitelongitude(value: double); virtual; abstract;
-      function  slewing: boolean; virtual; abstract;
+      function  is_slewing: boolean; virtual; abstract;
+
       function  slewsettletime: integer; virtual; abstract;
-      procedure setslewsettletime(value: integer); virtual; abstract;
+      procedure setslewsettletime(value: integer; out ok : boolean); virtual; abstract;
       function  targetdeclination: double; virtual; abstract;
-      procedure settargetdeclination(value: double); virtual; abstract;
+      procedure settargetdeclination(value: double; out ok:boolean); virtual; abstract;
       function  targetrightascension: double; virtual; abstract;
-      procedure settargetrightascension(value: double); virtual; abstract;
+      procedure settargetrightascension(value: double; out ok:boolean); virtual; abstract;
       function  tracking: boolean; virtual; abstract;
       procedure settracking(value: boolean); virtual; abstract;
       function  trackingrate: integer; virtual; abstract;
@@ -102,6 +103,8 @@ type
       procedure abortslew; virtual; abstract;
       function  axisrates(axis:integer): TAxisRates; virtual; abstract;
       function  canmoveaxis(axis:integer): boolean; virtual; abstract;
+
+      procedure axis_rates; virtual; abstract;
       function  destinationsideofpier(ra,dec: double):integer; virtual; abstract;
       procedure findhome; virtual; abstract;
       procedure moveaxis(axis:integer;rate:double); virtual; abstract;
@@ -110,12 +113,12 @@ type
       procedure setpark; virtual; abstract;
       procedure slewtoaltaz(az,alt: double); virtual; abstract;
       procedure slewtoaltazasync(az,alt: double); virtual; abstract;
-      procedure slewtocoordinates(ra,dec: double); virtual; abstract;
-      procedure slewtocoordinatesasync(ra,dec: double); virtual; abstract;
+      procedure slewtocoordinates(ra,dec: double; out ok:boolean); virtual; abstract;
+      procedure slewtocoordinatesasync(ra,dec: double; out ok:boolean); virtual; abstract;
       procedure slewtotarget; virtual; abstract;
       procedure slewtotargetasync; virtual; abstract;
       procedure synctoaltaz(az,alt: double); virtual; abstract;
-      procedure synctocoordinates(ra,dec: double); virtual; abstract;
+      procedure synctocoordinates(ra,dec: double; out ok: boolean ); virtual; abstract;
       procedure synctotarget; virtual; abstract;
       procedure unpark; virtual; abstract;
 
@@ -290,10 +293,6 @@ begin
     ok:=atpark;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
-  else if method='canfindhome' then begin
-    ok:=canfindhome;
-    result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
-  end
   else if method='canpark' then begin
     ok:=canpark;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
@@ -354,6 +353,10 @@ begin
     ok:=cansyncaltaz;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
+  else if method='canfindhome' then begin
+    ok:=canfindhome;
+    result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
   else if method='doesrefraction' then begin
     ok:=doesrefraction;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
@@ -363,7 +366,7 @@ begin
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='slewing' then begin
-    ok:=slewing;
+    ok:=is_slewing;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='tracking' then begin
@@ -394,6 +397,23 @@ var method,p1,p2,value: string;
     params: TStringlist;
     i,j: integer;
     ClientID,ClientTransactionID: LongWord;
+
+    procedure set_invalid_range2(i,j : double);
+    begin
+      fErrorNumber:=ERR_INVALID_VALUE; {1025}
+      FErrorMessage:=MSG_OUT_OF_RANGE+' Set values: '+floattostrF(i,ffGeneral,5,2)+', '+floattostrF(j,ffGeneral,5,2);
+    end;
+    procedure set_invalid_range(i : double);
+    begin
+      fErrorNumber:=ERR_INVALID_VALUE; {1025}
+      FErrorMessage:=MSG_OUT_OF_RANGE+' Set value: '+floattostrF(i,ffGeneral,5,2);
+    end;
+
+    procedure set_not_implemented;
+    begin
+      FErrorNumber:=ERR_NOT_IMPLEMENTED;
+      FErrorMessage:=MSG_NOT_IMPLEMENTED;
+    end;
 begin
   if pos('?',req)>0 then
     req:=req+'&'+arg
@@ -426,7 +446,7 @@ begin
     result:=FormatStringResp(value,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='connected' then begin
-    if GetParamBool(params,'Connected',ok) then
+    if GetParamBool(params,'connected',ok) then
       SetConnected(ok);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
@@ -509,12 +529,14 @@ begin
   end
   else if method='targetdeclination' then begin
     if GetParamFloat(params,'TargetDeclination',x) then
-      settargetdeclination(x);
+      settargetdeclination(x,ok);
+    if ok=false then set_invalid_range(x);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='targetrightascension' then begin
     if GetParamFloat(params,'TargetRightAscension',x) then
-      settargetrightascension(x);
+      settargetrightascension(x,ok);
+    if ok=false then set_invalid_range(x);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='utcdate' then begin
@@ -534,7 +556,8 @@ begin
   end
   else if method='slewsettletime' then begin
     if GetParamInt(params,'SlewSettleTime',i) then
-      setslewsettletime(i);
+      setslewsettletime(i, ok);
+    if ok=false then set_invalid_range(i);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='moveaxis' then begin
@@ -559,17 +582,20 @@ begin
   end
   else if method='slewtocoordinates' then begin
     if GetParamFloat(params,'RightAscension',x) and GetParamFloat(params,'Declination',y) then
-      slewtocoordinates(x,y);
+      slewtocoordinates(x,y, ok);
+    if ok=false then set_invalid_range2(x,y);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='slewtocoordinatesasync' then begin
     if GetParamFloat(params,'RightAscension',x) and GetParamFloat(params,'Declination',y) then
-      slewtocoordinatesasync(x,y);
+      slewtocoordinatesasync(x,y, ok);
+    if ok=false then set_invalid_range2(x,y);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='synctocoordinates' then begin
     if GetParamFloat(params,'RightAscension',x) and GetParamFloat(params,'Declination',y) then
-      synctocoordinates(x,y);
+      synctocoordinates(x,y,ok);
+    if ok=false then set_invalid_range2(x,y);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='synctoaltaz' then begin

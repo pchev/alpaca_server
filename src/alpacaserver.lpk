@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
-  <Package Version="4">
+  <Package Version="5">
     <Name Value="alpacaserver"/>
     <Type Value="RunAndDesignTime"/>
     <CompilerOptions>
@@ -14,7 +14,7 @@
         </OtherDefines>
       </Other>
     </CompilerOptions>
-    <Files Count="7">
+    <Files Count="8">
       <Item1>
         <Filename Value="cu_serial.pas"/>
         <UnitName Value="cu_serial"/>
@@ -43,7 +43,12 @@
         <Filename Value="cu_alpacatelescope.pas"/>
         <UnitName Value="cu_alpacatelescope"/>
       </Item7>
+      <Item8>
+        <Filename Value="cu_alpacarotator.pas"/>
+        <UnitName Value="cu_alpacarotator"/>
+      </Item8>
     </Files>
+    <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="2">
       <Item1>
         <PackageName Value="laz_synapse"/>

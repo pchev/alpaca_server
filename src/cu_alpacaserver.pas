@@ -111,11 +111,11 @@ constructor T_AlpacaServer.Create(AOwner: TComponent);
 begin
   inherited Create(aOwner);
   FIPAddr := '0.0.0.0';
-  FIPPort := '11122';
+  FIPPort := '11111';
   FDiscoveryPort := '32227';
   FServerName := 'ASCOM Alpaca Server - Freepascal-Synapse';
-  FManufacturer:='Alpaca Server project';
-  FLocation:='https://github.com/pchev/alpaca_server';
+  FManufacturer:='Alpaca Server project, https://github.com/pchev/alpaca_server';
+  FLocation:='sky_simulator';
   DefaultFormatSettings.DecimalSeparator := '.';
   DefaultFormatSettings.ThousandSeparator := ',';
   DefaultFormatSettings.DateSeparator := '/';
@@ -188,38 +188,36 @@ end;
 procedure T_AlpacaServer.ShowError(var msg:string);
 var buf:string;
 begin
-   buf:=copy(msg,1,200);
+   buf:=copy(msg,1,400);
    if assigned(FShowError) then FShowError(buf);
 end;
 
 procedure T_AlpacaServer.ShowMsg(var msg:string);
 var buf:string;
 begin
-  buf:=copy(msg,1,200);
+  buf:=copy(msg,1,400);
   if assigned(FShowMsg) then FShowMsg(buf);
 end;
 
 procedure T_AlpacaServer.ShowSocket(var msg:string);
 var buf:string;
 begin
-   buf:=copy(msg,1,200);
+   buf:=copy(msg,1,400);
    if assigned(FPortMsg) then FPortMsg(buf);
 end;
 
 procedure T_AlpacaServer.ShowDiscoverySocket(var msg:string);
 var buf:string;
 begin
-   buf:=copy(msg,1,200);
+   buf:=copy(msg,1,400);
    if assigned(FDiscoveryPortMsg) then FDiscoveryPortMsg(buf);
 end;
 
 function T_AlpacaServer.ProcessGet(HttpRequest: string): string;
-var req,doc: string;
+var req,doc, total: string;
     i,p,n,httpstatus: integer;
 begin
   try
-  doc:='GET '+HttpRequest;
-  ShowMsg(doc);
   if copy(HttpRequest,1,6)='/setup' then begin
     result:=ProcessSetup(HttpRequest);
   end
@@ -240,9 +238,11 @@ begin
     if n>=0 then begin
       inc(ServerTransactionID);
       doc:=DeviceList[n].device.ProcessGetRequest(req,ServerTransactionID,httpstatus) + CRLF;
-      ShowMsg(doc);
+
+      total:='GET '+req +' => '+doc ;
+      ShowMsg(total);
       if httpstatus=200 then begin
-      result:='HTTP/1.0 200' + CRLF
+      result:='HTTP/1.1 200' + CRLF
              +'Connection: close' + CRLF
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: application/json; charset=utf-8' + CRLF
@@ -252,7 +252,7 @@ begin
              +doc;
       end
       else begin
-        result:='HTTP/1.0 '+inttostr(httpstatus) + CRLF
+        result:='HTTP/1.1 '+inttostr(httpstatus) + CRLF
                +'Connection: close' + CRLF
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
@@ -264,8 +264,8 @@ begin
     end
     else begin
       doc:='400 - Not found.';
-      ShowMsg(doc);
-      result:='HTTP/1.0 400' + CRLF
+      ShowMsg(doc); {allow the instruction to be logged}
+      result:='HTTP/1.1 400' + CRLF
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -278,8 +278,8 @@ begin
   except
     on E: Exception do begin
       doc:='500 - '+E.Message;
-      ShowMsg(doc);
-      result:='HTTP/1.0 500' + CRLF
+      ShowMsg(doc);{allow the instruction to be logged}
+      result:='HTTP/1.1 500' + CRLF
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -296,7 +296,7 @@ var req,doc: string;
 begin
   try
   doc:='GET '+HttpRequest+' format: ImageBytes';
-  ShowMsg(doc);
+  ShowMsg(doc); {allow the instruction to be logged}
   req:=HttpRequest;
   n:=-1;
   for i:=0 to DeviceList.Count-1 do begin
@@ -311,7 +311,7 @@ begin
   inc(ServerTransactionID);
   doc:=DeviceList[n].device.ProcessGetImageBytesRequest(req,ServerTransactionID,httpstatus,s) + CRLF;
   if httpstatus=200 then begin
-  result:='HTTP/1.0 200' + CRLF
+  result:='HTTP/1.1 200' + CRLF
          +'Connection: close' + CRLF
          +'Content-length: ' + IntTostr(s.Size) + CRLF
          +'Content-type: application/imagebytes' + CRLF
@@ -320,7 +320,7 @@ begin
          +'' + CRLF;
   end
   else begin
-    result:='HTTP/1.0 '+inttostr(httpstatus) + CRLF
+    result:='HTTP/1.1 '+inttostr(httpstatus) + CRLF
            +'Connection: close' + CRLF
            +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
            +'Content-type: text/html; charset=utf-8' + CRLF
@@ -332,8 +332,8 @@ begin
 end
 else begin
   doc:='400 - Not found.';
-  ShowMsg(doc);
-  result:='HTTP/1.0 400' + CRLF
+  ShowMsg(doc); {allow the instruction to be logged}
+  result:='HTTP/1.1 400' + CRLF
          +'Connection: close' + CRLF
          +'Content-type: text/html; charset=utf-8' + CRLF
          +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -344,8 +344,8 @@ end;
 except
   on E: Exception do begin
     doc:='500 - '+E.Message;
-    ShowMsg(doc);
-    result:='HTTP/1.0 500' + CRLF
+    ShowMsg(doc); {allow the instruction to be logged}
+    result:='HTTP/1.1 500' + CRLF
            +'Connection: close' + CRLF
            +'Content-type: text/html; charset=utf-8' + CRLF
            +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -357,13 +357,12 @@ end;
 end;
 
 function T_AlpacaServer.ProcessPut(HttpRequest,arg: string): string;
-var req,doc: string;
+var req,doc,total: string;
     i,p,n,httpstatus: integer;
 begin
   try
-  doc:='PUT '+HttpRequest;
-  ShowMsg(doc);
   req:=HttpRequest;
+
   n:=-1;
   for i:=0 to DeviceList.Count-1 do begin
     p:=pos(DeviceList[i].devicepath,req);
@@ -376,9 +375,10 @@ begin
   if n>=0 then begin
     inc(ServerTransactionID);
     doc:=DeviceList[n].device.ProcessPutRequest(req,arg,ServerTransactionID,httpstatus) + CRLF;
-    ShowMsg(doc);
+    total:='PUT'+req+'   '+arg + '   =>   '+doc  ;
+    ShowMsg(total); {allow the instruction to be logged}
     if httpstatus=200 then begin
-      result:='HTTP/1.0 200' + CRLF
+      result:='HTTP/1.1 200' + CRLF
              +'Connection: close' + CRLF
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: application/json; charset=utf-8' + CRLF
@@ -388,7 +388,7 @@ begin
              +doc;
     end
     else begin
-      result:='HTTP/1.0 '+inttostr(httpstatus) + CRLF
+      result:='HTTP/1.1 '+inttostr(httpstatus) + CRLF
              +'Connection: close' + CRLF
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
@@ -400,8 +400,8 @@ begin
   end
   else begin
     doc:='400 - Not found.';
-    ShowMsg(doc);
-    result:='HTTP/1.0 400' + CRLF
+    ShowMsg(doc); {allow the instruction to be logged}
+    result:='HTTP/1.1 400' + CRLF
            +'Connection: close' + CRLF
            +'Content-type: text/html; charset=utf-8' + CRLF
            +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -412,8 +412,8 @@ begin
   except
     on E: Exception do begin
       doc:='500 - '+E.Message;
-      ShowMsg(doc);
-      result:='HTTP/1.0 500' + CRLF
+      ShowMsg(doc); {allow the instruction to be logged}
+      result:='HTTP/1.1 500' + CRLF
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -437,7 +437,7 @@ begin
          'You can change the server listen adress and port.<br/>'+
          'The program must be restarted to apply the changes.'+
          '</body></html>';
-    result:='HTTP/1.0 200' + CRLF
+    result:='HTTP/1.1 200' + CRLF
            +'Connection: close' + CRLF
            +'Content-type: text/html; charset=utf-8' + CRLF
            +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
@@ -459,7 +459,7 @@ begin
     if (n>=0) then begin
       doc:=DeviceList[n].device.ProcessSetup(req,httpstatus);
       if httpstatus=200 then begin
-        result:='HTTP/1.0 200' + CRLF
+        result:='HTTP/1.1 200' + CRLF
                +'Connection: close' + CRLF
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
@@ -469,7 +469,7 @@ begin
                +doc;
       end
       else begin
-        result:='HTTP/1.0 '+inttostr(httpstatus) + CRLF
+        result:='HTTP/1.1 '+inttostr(httpstatus) + CRLF
                +'Connection: close' + CRLF
                +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
                +'Content-type: text/html; charset=utf-8' + CRLF
@@ -481,7 +481,7 @@ begin
     end
     else begin
       doc:='400 - Not found.';
-      result:='HTTP/1.0 400' + CRLF
+      result:='HTTP/1.1 400' + CRLF
              +'Connection: close' + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF
              +'Date: ' + Rfc822DateTime(now) + CRLF
@@ -582,7 +582,7 @@ begin
     status:=200;
   end;
   if status=200 then begin
-    result:='HTTP/1.0 200' + CRLF
+    result:='HTTP/1.1 200' + CRLF
            +'Connection: close' + CRLF
            +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
            +'Content-type: application/json; charset=utf-8' + CRLF
@@ -592,7 +592,7 @@ begin
            +doc;
     end
     else begin
-      result:='HTTP/1.0 '+inttostr(status) + CRLF
+      result:='HTTP/1.1 '+inttostr(status) + CRLF
              +'Connection: close' + CRLF
              +'Content-length: ' + IntTostr(Length(Doc)) + CRLF
              +'Content-type: text/html; charset=utf-8' + CRLF

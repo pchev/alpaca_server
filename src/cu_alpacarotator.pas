@@ -41,14 +41,20 @@ type
       function fabsolute: boolean; virtual; abstract;
       function ismoving: boolean; virtual; abstract;
 
-      function  position: integer; virtual; abstract;
-      function  stepsize: integer; virtual; abstract;
-      function  maxstep: integer; virtual; abstract;
+      function  position: double; virtual; abstract;
+      function  targetposition: double; virtual; abstract;
+      function  MechanicalPosition: double; virtual; abstract;
+
+      function  stepsize: double; virtual; abstract;
+//      function  maxstep: integer; virtual; abstract;
       function  temperature: double; virtual; abstract;
       function  reverse: boolean; virtual; abstract;
+      function  canreverse: boolean; virtual; abstract;
       procedure setReverse(ok: boolean); virtual; abstract;
       procedure rotator_move(i: integer); virtual; abstract;
       procedure rotator_moveabsolute(x: double); virtual; abstract;
+      procedure rotator_movemechanical(x: double); virtual; abstract;
+      procedure rotator_sync(x: double); virtual; abstract;
 
       procedure rot_halt; virtual; abstract;
   end;
@@ -106,6 +112,11 @@ begin
     value:=Name;
     result:=FormatStringResp(value,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
+  else if method='supportedactions' then begin
+    lst:=SupportedActions;
+    result:=FormatStringListResp(lst,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+    lst.Free;
+  end
   else if method='absolute' then begin
     ok:=fabsolute;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
@@ -115,16 +126,20 @@ begin
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='position' then begin
-    i:=position;
-    result:=FormatIntResp(i,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+    x:=position;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='targetposition' then begin
+    x:=targetposition;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='mechanicalposition' then begin
+    x:=mechanicalposition;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='stepsize' then begin
-    i:=position;
-    result:=FormatIntResp(i,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
-  end
-  else if method='maxstep' then begin
-    i:=maxstep;
-    result:=FormatIntResp(i,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+    x:=stepsize;
+    result:=FormatFloatResp(x,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='temperature' then begin
     x:=temperature;
@@ -134,7 +149,10 @@ begin
     ok:=reverse;
     result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
-
+  else if method='canreverse' then begin
+    ok:=canreverse;
+    result:=FormatBoolResp(ok,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
   else begin
     result:='GET - Unknown device method: '+method;
     status:=400;
@@ -181,7 +199,7 @@ begin
     result:=FormatStringResp(value,ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='connected' then begin
-    if GetParamBool(params,'Connected',ok) then
+    if GetParamBool(params,'connected',ok) then
       SetConnected(ok);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
@@ -190,18 +208,28 @@ begin
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='reverse' then begin
-    if GetParamBool(params,'Reverse',ok) then
+    if GetParamBool(params,'reverse',ok) then
       setReverse(ok);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='move' then begin
-    if GetParamInt(params,'Position',i) then {parameter is position, integer}
+    if GetParamInt(params,'position',i) then {parameter is position, integer}
     rotator_move(i);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else if method='moveabsolute' then begin
-    if GetParamFloat(params,'Position',x) then {parameter is Position, double}
+    if GetParamFloat(params,'position',x) then {parameter is Position, double}
     rotator_moveabsolute(x);
+    result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='movemechanical' then begin
+    if GetParamFloat(params,'position',x) then {parameter is Position, double}
+    rotator_movemechanical(x);
+    result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
+  end
+  else if method='sync' then begin
+    if GetParamFloat(params,'position',x) then {parameter is Position, double}
+    rotator_sync(x);
     result:=FormatEmptyResp(ClientTransactionID,ServerTransactionID,FErrorNumber,FErrorMessage);
   end
   else begin

@@ -1,6 +1,4 @@
 unit cu_tcpserver;
-
-
 {
 Copyright (C) 2020 Patrick Chevalley
 
@@ -24,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 { TCP/IP Connexion, based on Synapse Echo demo }
 
+{ April 2022, modified to persistent connection by Han Kleijn}
+
 {$MODE objfpc}{$H+}
 
 interface
@@ -31,12 +31,13 @@ interface
 uses
   {$IFDEF WINDOWS}
   Variants, comobj, ActiveX,
+  {$else}
+  process,
   {$ENDIF}
   blcksock, synsock, synautil, synaip, cu_alpacadevice,
-  process, fpjson, jsonparser, SysUtils, Classes;
+  fpjson, jsonparser, SysUtils, Classes,strutils;
 
 const
-  Maxclient=100;
   msgFailed='Failed!';
 
 type
@@ -55,7 +56,6 @@ type
     FProcessGetImageBytes: TGetImageBytes;
     FProcessPut: TPutCmd;
   public
-    id: integer;
     abort, stoping: boolean;
     remoteip, remoteport: string;
     constructor Create(hsock: tSocket);
@@ -69,6 +69,7 @@ type
     property ConnectTime: double read FConnectTime;
     property Terminated;
     property onTerminate: TIntProc read FTerminate write FTerminate;
+
     property onProcessGet: TGetCmd read FProcessGet write FProcessGet;
     property onProcessGetImageBytes: TGetImageBytes read FProcessGetImageBytes write FProcessGetImageBytes;
     property onProcessPut: TPutCmd read FProcessPut write FProcessPut;
@@ -85,12 +86,10 @@ type
     FProcessGetImageBytes: TGetImageBytes;
     FProcessPut: TPutCmd;
     procedure ShowError;
-    procedure ThrdTerminate(var i: integer);
     function GetIPport: string;
   public
     stoping: boolean;
-    TCPThrd: array [1..Maxclient] of TTCPThrd;
-    ThrdActive: array [1..Maxclient] of boolean;
+    TCPThrd: TTCPThrd;
     constructor Create;
     procedure Execute; override;
     procedure ShowSocket;
@@ -130,111 +129,23 @@ type
     property onShowSocket: TStringProc read FShowSocket write FShowSocket;
   end;
 
+
 implementation
 
 {$ifdef darwin}
-uses BaseUnix;       //  to catch SIGPIPE
+{$ifdef CPU32}
+ uses BaseUnix;       //  to catch SIGPIPE
 
-var
-  NewSigRec, OldSigRec: SigActionRec;
-  res: integer;
-
+ var
+   NewSigRec, OldSigRec: SigActionRec;
+   res: integer;
+{$endif}
 {$endif}
 
-procedure SplitCmdLineParams(const Params: string; ParamList: TStrings;
-                             ReadBackslash: boolean = false);
-// split spaces, quotes are parsed as single parameter
-// if ReadBackslash=true then \" is replaced to " and not treated as quote
-// #0 is always end
-type
-  TMode = (mNormal,mApostrophe,mQuote);
-var
-  p: Integer;
-  Mode: TMode;
-  Param: String;
-begin
-  p:=1;
-  while p<=length(Params) do
-  begin
-    // skip whitespace
-    while (p<=length(Params)) and (Params[p] in [' ',#9,#10,#13]) do inc(p);
-    if (p>length(Params)) or (Params[p]=#0) then
-      break;
-    //writeln('SplitCmdLineParams After Space p=',p,'=[',Params[p],']');
-    // read param
-    Param:='';
-    Mode:=mNormal;
-    while p<=length(Params) do
-    begin
-      case Params[p] of
-      #0:
-        break;
-      '\':
-        begin
-          inc(p);
-          if ReadBackslash then
-            begin
-            // treat next character as normal character
-            if (p>length(Params)) or (Params[p]=#0) then
-              break;
-            if ord(Params[p])<128 then
-            begin
-              Param+=Params[p];
-              inc(p);
-            end else begin
-              // next character is already a normal character
-            end;
-          end else begin
-            // treat backslash as normal character
-            Param+='\';
-          end;
-        end;
-      '''':
-        begin
-          inc(p);
-          case Mode of
-          mNormal:
-            Mode:=mApostrophe;
-          mApostrophe:
-            Mode:=mNormal;
-          mQuote:
-            Param+='''';
-          end;
-        end;
-      '"':
-        begin
-          inc(p);
-          case Mode of
-          mNormal:
-            Mode:=mQuote;
-          mApostrophe:
-            Param+='"';
-          mQuote:
-            Mode:=mNormal;
-          end;
-        end;
-      ' ',#9,#10,#13:
-        begin
-          if Mode=mNormal then break;
-          Param+=Params[p];
-          inc(p);
-        end;
-      else
-        Param+=Params[p];
-        inc(p);
-      end;
-    end;
-    //writeln('SplitCmdLineParams Param=#'+Param+'#');
-    ParamList.Add(Param);
-  end;
-end;
-
 constructor TTCPDaemon.Create;
-var i: integer;
 begin
   inherited Create(True);
   FreeOnTerminate := True;
-  for i:=1 to Maxclient do TCPThrd[i]:=nil;
 end;
 
 procedure TTCPDaemon.ShowError;
@@ -265,21 +176,13 @@ begin
     FShowSocket(locport);
 end;
 
-procedure TTCPDaemon.ThrdTerminate(var i: integer);
-begin
-  if (i>0) and (i<=Maxclient) then
-     ThrdActive[i] := False;
-end;
 
 procedure TTCPDaemon.Execute;
 var
   ClientSock: TSocket;
-  i, n: integer;
 begin
   //writetrace('start tcp deamon');
   stoping := False;
-  for i := 1 to Maxclient do
-    ThrdActive[i] := False;
   sock := TTCPBlockSocket.Create;
   //writetrace('blocksocked created');
   try
@@ -313,46 +216,13 @@ begin
         begin
           ClientSock := accept;
           if lastError = 0 then
-          begin
-            n := -1;
-            for i := 1 to Maxclient do
-              if (not ThrdActive[i]) or
-                (TCPThrd[i] = nil) or (TCPThrd[i].Fsock = nil) or
-                (TCPThrd[i].terminated) then
-              begin
-                n := i;
-                break;
-              end;
-            if n > 0 then
-            begin
-              TCPThrd[n] := TTCPThrd.Create(ClientSock);
-              TCPThrd[n].onTerminate := @ThrdTerminate;
-              TCPThrd[n].onProcessGet := FProcessGet;
-              TCPThrd[n].onProcessGetImageBytes := FProcessGetImageBytes;
-              TCPThrd[n].onProcessPut := FProcessPut;
-              TCPThrd[n].id := n;
-              ThrdActive[n] := True;
-              TCPThrd[n].Start;
-            end
-            else
-              with TTCPThrd.Create(ClientSock) do
-              begin
-                Fsock := TTCPBlockSocket.Create;
-                Fsock.socket := CSock;
-                Fsock.GetSins;
-                Fsock.MaxLineLength := 1024;
-                if not terminated then
-                begin
-                  if Fsock <> nil then begin
-                   Fsock.SendString('HTTP/1.0 500' + CRLF);
-                   Fsock.SendString('' + CRLF);
-                   Fsock.SendString(msgFailed + ' Maximum connection reach!' + CRLF);
-                  end;
-                  Fsock.CloseSocket;
-                  Fsock.Free;
-                end;
-                Free;
-              end;
+          begin {ready one HTTP header plus optional body}
+            TCPThrd := TTCPThrd.Create(ClientSock);
+            TCPThrd.onProcessGet := FProcessGet;
+            TCPThrd.onProcessGetImageBytes := FProcessGetImageBytes;
+            TCPThrd.onProcessPut := FProcessPut;
+            TCPThrd.Start;
+
           end
           else if lasterror <> 0 then
             Synchronize(@ShowError);
@@ -373,7 +243,6 @@ begin
   FreeOnTerminate := True;
   Csock := Hsock;
   abort := False;
-  id:=-1;
   FImageBytes:=TMemoryStream.Create;
 end;
 
@@ -383,23 +252,19 @@ begin
     FSock.AbortSocket;
     Fsock.Free;
   end;
-  if assigned(FTerminate) then
-    FTerminate(id);
   if FImageBytes<>nil then
     FImageBytes.Free;
   inherited Destroy;
 end;
 
-procedure TTCPThrd.Execute;
+procedure TTCPThrd.Execute; {reads one HTTP header plus optional body}
 var
-  req,hdr,body,method,buf: string;
-  args:Tstringlist;
-  cl: integer;
+  body,method,buf,upbuf: string;
+  cl,i,j,k: integer;
   imagebytes: boolean;
 begin
   try
     Fsock := TTCPBlockSocket.Create;
-    args:=Tstringlist.Create;
     FConnectTime := now;
     stoping := False;
     try
@@ -411,63 +276,74 @@ begin
       remoteport := IntToStr(Fsock.GetRemoteSinPort);
       with Fsock do
       begin
-          if stoping or terminated then
-            exit;
-          req := RecvString(500);
-          if lastError = 0 then
+        if stoping or terminated then
+          exit;
+        repeat
+          buf:=RecvTerminated(100,#13+#10+#13+#10);// receive the full header
+          if LastError=WSAETIMEDOUT then continue;// Timeout, try to read next
+          if lastError<>0 then break;             // Other error, maybe client disconnect
+
+          //GET /api/v1/camera/0/driverversion?ClientID=3200023&ClientTransactionID=373 HTTP/1.1\r\n
+          //Host: 127.0.0.1:11111\r\n
+          //Keep-Alive: 300\r\n
+          //Connection: keep-alive\r\n
+          //\r\n
+
+          method:=uppercase(copy(buf,1,3));{either GET or PUT}
+          k:=posex(' ',buf,6);// find end of Request-URI
+          FHttpRequest:=copy(buf,5,k-5);//extract Request-URI, something like '/api/v1/camera/0/ccdtemperature?ClientID=3200089&ClientTransactionID=120'
+          k:=k+length(' HTTP/1.1'+#13+#10); //pointer to the fields (second line and further}
+
+          cl:=-1; {assume no body behind header}
+          upbuf:=UpperCase(copy(buf,k,300));   //field headers should be treated as case insensitive. Assume total field size 300 max
+          i:=Pos('CONTENT-LENGTH:',Upbuf);
+          if i>0 then {there is a body behind the header}
           begin
-            hdr:='';
-            cl:=-1;
-            imagebytes := False;
-            repeat
-              buf:=RecvString(100);
-              if trim(buf)='' then break;
-              hdr:=hdr+crlf+buf;
-              if Pos('CONTENT-LENGTH:',UpperCase(buf))=1 then begin
-                delete(buf,1,15);
-                cl:=StrToIntDef(trim(buf),0);
-              end;
-              if Pos('ACCEPT:',UpperCase(buf))=1 then begin
-                delete(buf,1,7);
-                imagebytes:=pos('APPLICATION/IMAGEBYTES',UpperCase(trim(buf)))>0;
-              end;
-            until LastError<>0;
-            body:='';
-            if cl>0 then begin
-              body:=RecvBufferStr(cl,100);
-            end
-            else if cl=0 then begin
-              repeat
-                body:=body+RecvPacket(100);
-              until LastError<>0;
-            end;
-            SplitCmdLineParams(req,args);
-            method:=uppercase(args[0]);
-            if method='GET' then begin
-               FHttpRequest:=args[1];
-               if imagebytes then begin
-                 // imagearray imagebytes request
-                 Synchronize(@ProcessGetImageBytes);
-                 SendString(FHttpResult);
-                 SendStreamRaw(FImageBytes);
-                 FImageBytes.Clear;
-               end
-               else begin
-                 // all other request
-                 Synchronize(@ProcessGet);
-                 SendString(FHttpResult);
-               end;
-            end
-            else if method='PUT' then begin
-               FHttpRequest:=args[1];
-               FBody:=body;
-               Synchronize(@ProcessPut);
-               SendString(FHttpResult);
-            end;
+             i:=i+length('CONTENT-LENGTH:');
+             j:=PosEx(#13,UpBuf,i);
+             if j=0 then j:=999; {content lenght was the last line}
+             cl:=StrToIntDef(trim(copy(Upbuf,i,j-i)),0); {length of the body behind header}
           end;
+          imagebytes:=pos('APPLICATION/IMAGEBYTES',Upbuf,7)>0; {found ACCEPT: APPLICATION/IMAGEBYTES. Only requested when an image is made}
+
+
+         //     PUT /api/v1/camera/0/connected HTTP/1.1\r\n                   header
+         //     Host: 127.0.0.1:11111\r\n                                     header
+         //     Keep-Alive: 300\r\n                                           header
+         //     Connection: keep-alive\r\n                                    header
+         //     Content-Type: application/x-www-form-urlencoded\r\n           header
+         //     Content-Length: 55\r\n                                        header
+         //     \r\n                                                          end header marker
+         //     Connected=True&ClientID=3200023&ClientTransactionID=370       body
+
+          if cl>0 then {there is a body behind the header}
+            body:=RecvBufferStr(cl,100) {receive the body, something like: Connected=True&ClientID=3200023&ClientTransactionID=370}
+          else
+            body:='';
+
+          if method='GET' then begin
+             if imagebytes then begin
+               // imagearray imagebytes request
+               Synchronize(@ProcessGetImageBytes);
+               SendString(FHttpResult);
+               SendStreamRaw(FImageBytes);
+               FImageBytes.Clear;
+             end
+             else begin
+               // all other request
+               Synchronize(@ProcessGet);
+               SendString(FHttpResult);
+             end;
+          end
+          else if method='PUT' then begin
+             FBody:=body;
+             Synchronize(@ProcessPut);
+             SendString(FHttpResult);
+          end;
+
+        until false;{repeat}
       end;
     finally
-      args.Free;
     end;
   except
   end;

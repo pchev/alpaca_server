@@ -37,7 +37,7 @@ type
   end;
   TAxisRates = array of TAxisRate;
   TTrackingRates = array of integer;
-  Timg           = array of array of integer;
+  Timg           = array of array of word;
 
   // ImageBytes support, from Alpaca documentation
   TArrayUInt16 = array of cuint16;
@@ -70,8 +70,8 @@ const
   CR = #$0d;
   LF = #$0a;
   CRLF = CR + LF;
-  ERR_NOT_IMPLEMENTED = $400;
-  ERR_INVALID_VALUE = $401;
+  ERR_NOT_IMPLEMENTED = $400;{1024}
+  ERR_INVALID_VALUE = $401; {1025}
   ERR_VALUE_NOT_SET = $402;
   ERR_NOT_CONNECTED = $407;
   ERR_INVALID_WHILE_PARKED = $408;
@@ -85,15 +85,16 @@ const
   MSG_NOT_CONNECTED = 'Not connected';
   MSG_DRIVER_ERROR = 'Driver error';
 
+  MSG_OUT_OF_RANGE = 'Set value outside range. Will be clamped within range';
 
 type
-
   T_AlpacaDevice = class(TComponent)
     protected
       FConnected: boolean;
       FErrorNumber: integer;
       FErrorMessage: String;
       FPath,FSetupPath: string;
+
     public
       constructor Create(AOwner: TComponent);override;
       destructor  Destroy; override;
@@ -121,6 +122,7 @@ type
       function  ProcessPutRequest(req,arg: string; ServerTransactionID:LongWord; out status: integer):string; virtual; abstract;
       function  ProcessSetup(req: string; out status: integer):string; virtual; abstract;
       function  GetGuid: string; virtual; abstract;
+
       // Common properties and methods.
       function  Action( actionName, actionParameters: string):string; virtual; abstract;
       procedure CommandBlind( command: string;  raw: boolean = false); virtual; abstract;
@@ -134,6 +136,7 @@ type
       function  InterfaceVersion: integer; virtual; abstract;
       function  Name:string; virtual; abstract;
       function  SupportedActions:TStringList; virtual; abstract;
+
       property  Path: string read FPath write FPath;
       property  SetupPath: string read FSetupPath write FSetupPath;
   end;
@@ -142,6 +145,7 @@ procedure SplitRec(buf,sep:string; var arg: TStringList);
 
 
 implementation
+
 
 constructor T_AlpacaDevice.Create(AOwner: TComponent);
 begin
@@ -158,44 +162,44 @@ function T_AlpacaDevice.DecodeRequest(req: string; out method: string; var param
 var i,p: integer;
     buf:string;
 begin
-result:=false;
-buf:=copy(req,1,length(FPath));
-if copy(req,1,length(FPath))<>FPath then exit;
-Delete(req,1,length(FPath));
-p:=pos('?',req);
-if p<=0 then begin
-  method:=req;
-  params.Clear;
-  ClientID:=0;
-  ClientTransactionID:=0;
-end
-else begin
-  method:=copy(req,1,p-1);
-  delete(req,1,p);
-  params.Clear;
-  ClientID:=0;
-  ClientTransactionID:=0;
-  SplitRec(req,'&',params);
-  for i:=0 to params.Count-1 do begin
-    if uppercase(copy(params[i],1,9))='CLIENTID=' then begin
-      buf:=params[i];
-      delete(buf,1,9);
-      ClientID:=StrToIntDef(buf,0);
-      params.Delete(i);
-      break;
+  result:=false;
+  buf:=copy(req,1,length(FPath));
+  if copy(req,1,length(FPath))<>FPath then exit;
+  Delete(req,1,length(FPath));
+  p:=pos('?',req);
+  if p<=0 then begin
+    method:=req;
+    params.Clear;
+    ClientID:=0;
+    ClientTransactionID:=0;
+  end
+  else begin
+    method:=copy(req,1,p-1);
+    delete(req,1,p);
+    params.Clear;
+    ClientID:=0;
+    ClientTransactionID:=0;
+    SplitRec(req,'&',params);
+    for i:=0 to params.Count-1 do begin
+      if uppercase(copy(params[i],1,9))='CLIENTID=' then begin
+        buf:=params[i];
+        delete(buf,1,9);
+        ClientID:=StrToIntDef(buf,0);
+        params.Delete(i);
+        break;
+      end;
+    end;
+    for i:=0 to params.Count-1 do begin
+      if uppercase(copy(params[i],1,20))='CLIENTTRANSACTIONID=' then begin
+        buf:=params[i];
+        delete(buf,1,20);
+        ClientTransactionID:=StrToIntDef(buf,0);
+        params.Delete(i);
+        break;
+      end;
     end;
   end;
-  for i:=0 to params.Count-1 do begin
-    if uppercase(copy(params[i],1,20))='CLIENTTRANSACTIONID=' then begin
-      buf:=params[i];
-      delete(buf,1,20);
-      ClientTransactionID:=StrToIntDef(buf,0);
-      params.Delete(i);
-      break;
-    end;
-  end;
-end;
-result:=true;
+  result:=true;
 end;
 
 function T_AlpacaDevice.DecodeSetupRequest(req: string; out method: string; var params: TStringlist):boolean;
@@ -425,7 +429,7 @@ begin
   metadata.ServerTransactionID:=ServerTransactionID;
   metadata.DataStart:=sizeof(metadata);
   metadata.ImageElementType:=2;
-  metadata.TransmissionElementType:=8;
+  metadata.TransmissionElementType:=8;  {Alpaca standard 2021-12-7:  Int16 = 1, Int32 = 2, Double = 3, Single = 4, Decimal = 5, Byte = 6, Int64 = 7, UInt16 = 8, UInt32 = 9  }
   metadata.Rank:=2;
   metadata.Dimension1:=length(value);
   metadata.Dimension2:=length(value[0]);
