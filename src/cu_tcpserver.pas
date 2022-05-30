@@ -295,7 +295,7 @@ begin
           k:=k+length(' HTTP/1.1'+#13+#10); //pointer to the fields (second line and further}
 
           cl:=-1; {assume no body behind header}
-          upbuf:=UpperCase(copy(buf,k,300));   //field headers should be treated as case insensitive. Assume total field size 300 max
+          upbuf:=UpperCase(copy(buf,k,500));   //field headers should be treated as case insensitive. Assume total field size 500 max
           i:=Pos('CONTENT-LENGTH:',Upbuf);
           if i>0 then {there is a body behind the header}
           begin
