@@ -317,7 +317,7 @@ begin
          //     Connected=True&ClientID=3200023&ClientTransactionID=370       body
 
           if cl>0 then {there is a body behind the header}
-            body:=RecvBufferStr(cl,100) {receive the body, something like: Connected=True&ClientID=3200023&ClientTransactionID=370}
+            body:=RecvBufferStr(cl,500) {receive the body, something like: Connected=True&ClientID=3200023&ClientTransactionID=370}
           else
             body:='';
 
